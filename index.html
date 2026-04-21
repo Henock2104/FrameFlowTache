@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FrameFlowTache Elite</title>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#6366f1">
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+
+<style>
+:root {
+--primary:#6366f1;--success:#10b981;--danger:#ef4444;
+--bg:#0f172a;--card:#1e293b;--text:#f8fafc;--border:#334155;
+}
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Inter',sans-serif}
+body{background:var(--bg);color:var(--text);display:flex;justify-content:center;padding:10px}
+
+.app-container{max-width:450px;width:100%;background:var(--card);padding:18px;border-radius:20px}
+
+.btn-main{background:var(--primary);color:white;border:none;padding:12px;border-radius:10px;font-weight:800;width:100%;margin-bottom:10px}
+
+.task-item{padding:10px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between}
+.done{opacity:0.4}
+</style>
+</head>
+
+<body onclick="initAudio()">
+
+<div class="app-container">
+
+<div id="alert" style="display:none;background:red;padding:10px;border-radius:10px;margin-bottom:10px">
+<span id="alertText"></span>
+<button onclick="stopAlarm()">OK</button>
+</div>
+
+<h3>FRAMEFLOWTACHE</h3>
+
+<button id="installBtn" class="btn-main" style="display:none">Installer</button>
+
+<input id="title" placeholder="Tâche">
+<input type="datetime-local" id="date">
+
+<button class="btn-main" onclick="addTask()">Ajouter</button>
+
+<ul id="list"></ul>
+
+</div>
+
+<script>
+// INSTALL PWA
+let deferredPrompt;
+const installBtn = document.getElementById("installBtn");
+
+window.addEventListener("beforeinstallprompt", e=>{
+e.preventDefault();
+deferredPrompt = e;
+installBtn.style.display="block";
+});
+
+installBtn.onclick = ()=>{
+deferredPrompt.prompt();
+deferredPrompt.userChoice.then(()=>{installBtn.style.display="none"});
+};
+
+// AUDIO
+let aCtx;
+function initAudio(){
+if(!aCtx){
+aCtx = new (window.AudioContext||window.webkitAudioContext)();
+}
+}
+
+function beep(){
+try{
+const o=aCtx.createOscillator();
+const g=aCtx.createGain();
+o.connect(g);g.connect(aCtx.destination);
+o.start();o.stop(aCtx.currentTime+0.1);
+}catch{}
+}
+
+// DATA
+let tasks = JSON.parse(localStorage.getItem("tasks")||"[]");
+
+function save(){
+localStorage.setItem("tasks",JSON.stringify(tasks));
+}
+
+// TASKS
+function addTask(){
+const title=document.getElementById("title").value;
+const date=document.getElementById("date").value;
+if(!title) return;
+
+tasks.push({id:Date.now(),title,date,done:false,alerted:false});
+save();
+render();
+}
+
+function toggle(id){
+tasks=tasks.map(t=>t.id===id?{...t,done:!t.done}:t);
+save();
+render();
+}
+
+function del(id){
+tasks=tasks.filter(t=>t.id!==id);
+save();
+render();
+}
+
+// ALARME
+let alarmInterval;
+
+function startAlarm(t){
+document.getElementById("alert").style.display="block";
+document.getElementById("alertText").innerText=t;
+
+if(navigator.vibrate){
+navigator.vibrate([300,100,300]);
+}
+
+alarmInterval=setInterval(beep,500);
+}
+
+function stopAlarm(){
+document.getElementById("alert").style.display="none";
+clearInterval(alarmInterval);
+}
+
+// CHECK TEMPS (optimisé 5s)
+setInterval(()=>{
+const now=new Date();
+tasks.forEach(t=>{
+if(t.date && !t.done && !t.alerted && new Date(t.date)<=now){
+startAlarm(t.title);
+t.alerted=true;
+save();
+}
+});
+},5000);
+
+// RENDER
+function render(){
+const list=document.getElementById("list");
+list.innerHTML=tasks.map(t=>`
+<li class="task-item ${t.done?'done':''}">
+<span onclick="toggle(${t.id})">${t.title}</span>
+<button onclick="del(${t.id})">X</button>
+</li>`).join("");
+}
+
+render();
+
+// SERVICE WORKER
+if("serviceWorker" in navigator){
+navigator.serviceWorker.register("service-worker.js");
+}
+</script>
+
+</body>
+</html>
