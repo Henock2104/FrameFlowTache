@@ -1,0 +1,185 @@
+<!DOCTYPE html>  <html lang="fr">  
+<head>  
+    <meta charset="UTF-8">  
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">  
+    <title>FrameFlowTache Elite v5.8 | Final</title>  
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">  
+    <style>  
+        :root {  
+            --primary: #6366f1; --success: #10b981; --danger: #ef4444; --warning: #f59e0b;  
+            --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --text-light: #94a3b8; --border: #334155;  
+        }  
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }  
+        body { background: var(--bg); color: var(--text); padding: 10px; display: flex; justify-content: center; }  .app-container { width: 100%; max-width: 450px; background: var(--card); padding: 18px; border-radius: 20px; border: 1px solid var(--border); height: fit-content; }  
+      
+    #alert-banner {   
+        display: none; background: var(--danger); color: white; padding: 12px;   
+        border-radius: 12px; margin-bottom: 15px; text-align: center; font-weight: 800; animation: blink 1s infinite;  
+    }  
+    @keyframes blink { 50% { opacity: 0.7; } }  
+
+    h1 { font-size: 1.1rem; font-weight: 800; color: var(--primary); text-align: center; margin-bottom: 15px; }  
+
+    /* RECHERCHE ET TRI COMPACTS */  
+    .toolbar { display: flex; gap: 6px; margin-bottom: 15px; }  
+    .toolbar input, .toolbar select { padding: 10px; font-size: 0.8rem; margin-bottom: 0; background: rgba(255,255,255,0.05); }  
+
+    .form-section { background: rgba(255,255,255,0.03); padding: 15px; border-radius: 15px; border: 1px solid var(--border); margin-bottom: 15px; }  
+    input, select {   
+        width: 100%; padding: 12px; background: var(--bg); border: 1px solid var(--border);   
+        border-radius: 10px; color: var(--text); font-size: 0.9rem; margin-bottom: 10px; outline: none;  
+    }  
+
+    .audio-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }  
+    .btn-tool { background: var(--primary); color: white; border: none; padding: 8px 10px; border-radius: 8px; font-size: 0.7rem; font-weight: 700; cursor: pointer; flex-shrink: 0; }  
+    .btn-test { background: var(--success); }  
+
+    .btn-main { background: var(--primary); color: white; border: none; padding: 14px; border-radius: 10px; cursor: pointer; font-weight: 800; width: 100%; text-transform: uppercase; }  
+      
+    .task-item { background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-left: 4px solid var(--border); padding: 12px; border-radius: 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }  
+    .task-item.overdue { border-left-color: var(--danger); }  
+    .task-item.done { border-left-color: var(--success); opacity: 0.4; }  
+
+    .actions { display: flex; gap: 12px; }  
+    .icon-btn { background: none; border: none; color: var(--text-light); cursor: pointer; }  
+    .check-box { width: 20px; height: 20px; border: 2px solid var(--primary); border-radius: 6px; cursor: pointer; margin-right: 10px; display: flex; align-items: center; justify-content: center; }  
+    .check-box.checked { background: var(--success); border-color: var(--success); }  
+    .check-box.checked::after { content: '✓'; color: white; font-size: 12px; font-weight: 900; }  
+</style>
+
+</head>  
+<body onclick="initAudio()">  <div class="app-container">  
+    <div id="alert-banner">🚨 ALERTE : <span id="alert-name"></span><br>  
+        <button onclick="stopAlarm()" style="margin-top:8px; padding:4px 10px; border-radius:5px; border:none; cursor:pointer; font-size:0.7rem; font-weight:800;">OK / ARRÊTER</button>  
+    </div>  <h1>FRAMEFLOWTACHE  ELITE </h1>  
+
+<div class="toolbar">  
+    <input type="text" id="search" placeholder="Rechercher..." oninput="render()">  
+    <select id="sort" onchange="render()" style="width: auto;">  
+        <option value="recent">RÉCENT</option>  
+        <option value="date">DATE </option>  
+    </select>  
+</div>  
+
+<div class="form-section">  
+    <input type="text" id="title" placeholder="Désignation de la mission...">  
+    <input type="datetime-local" id="date">  
+    <select id="cat">  
+        <option value="TRAVAIL"> TRAVAIL</option>  
+        <option value="PERSO">  PERSO</option>  
+        <option value="URGENT">  URGENT</option>  
+    </select>  
+
+    <div class="audio-row">  
+        <input type="file" id="file" accept="audio/*" style="display:none" onchange="loadAudio(event)">  
+        <label for="file" class="btn-tool"> SON MP3</label>  
+        <span id="fName" style="font-size:0.6rem; color:var(--text-light); flex:1; white-space:nowrap; overflow:hidden;">Défaut (Bip)</span>  
+        <button class="btn-tool btn-test" onclick="testAudio()">TEST</button>  
+    </div>  
+
+    <button class="btn-main" id="subBtn" onclick="addTask()">Programmer</button>  
+</div>  
+
+<ul id="list"></ul>
+
+</div>  <script>  
+    let tasks = JSON.parse(localStorage.getItem('pro_elite_v5.8')) || [];  
+    let aCtx, localSound, alarmInt, player, editingId = null;  
+  
+    function initAudio() { if (!aCtx) aCtx = new (window.AudioContext || window.webkitAudioContext)(); }  
+      
+    function loadAudio(e) {  
+        if (e.target.files[0]) {  
+            localSound = URL.createObjectURL(e.target.files[0]);  
+            document.getElementById('fName').innerText = e.target.files[0].name;  
+        }  
+    }  
+  
+    function bip() {  
+        if (!aCtx) return;  
+        const o = aCtx.createOscillator(), g = aCtx.createGain();  
+        o.type = 'square'; o.frequency.setValueAtTime(1000, aCtx.currentTime);  
+        g.gain.setValueAtTime(0.1, aCtx.currentTime);  
+        g.gain.exponentialRampToValueAtTime(0.01, aCtx.currentTime + 0.1);  
+        o.connect(g); g.connect(aCtx.destination);  
+        o.start(); o.stop(aCtx.currentTime + 0.1);  
+    }  
+  
+    function testAudio() { initAudio(); if (localSound) { const a = new Audio(localSound); a.play(); setTimeout(()=>a.pause(), 2000); } else { bip(); } }  
+  
+    function startAlarm(t) {  
+        document.getElementById('alert-banner').style.display = 'block';  
+        document.getElementById('alert-name').innerText = t.toUpperCase();  
+        if (localSound) { if(!player){ player = new Audio(localSound); player.loop = true; player.play(); }}   
+        else { if(!alarmInt) alarmInt = setInterval(bip, 250); }  
+    }  
+  
+    function stopAlarm() {  
+        document.getElementById('alert-banner').style.display = 'none';  
+        if (alarmInt) { clearInterval(alarmInt); alarmInt = null; }  
+        if (player) { player.pause(); player.currentTime = 0; player = null; }  
+    }  
+  
+    setInterval(() => {  
+        const now = new Date();  
+        tasks.forEach(t => {  
+            if (t.date && !t.done && !t.alerted && new Date(t.date) <= now) {  
+                startAlarm(t.title); t.alerted = true; save(); render();  
+            }  
+        });  
+    }, 1000);  
+  
+    function addTask() {  
+        const title = document.getElementById('title').value, date = document.getElementById('date').value, cat = document.getElementById('cat').value;  
+        if (!title) return;  
+        if (editingId) {  
+            tasks = tasks.map(t => t.id === editingId ? {...t, title, date, cat, alerted: false} : t);  
+            editingId = null; document.getElementById('subBtn').innerText = "Programmer";  
+        } else {  
+            tasks.push({ id: Date.now(), title, date, cat, done: false, alerted: false });  
+        }  
+        document.getElementById('title').value = ""; save(); render();  
+    }  
+  
+    function editTask(id) {  
+        const t = tasks.find(x => x.id === id);  
+        document.getElementById('title').value = t.title; document.getElementById('date').value = t.date;  
+        document.getElementById('cat').value = t.cat; editingId = id;  
+        document.getElementById('subBtn').innerText = "Enregistrer";  
+    }  
+  
+    function deleteTask(id) { tasks = tasks.filter(t => t.id !== id); stopAlarm(); save(); render(); }  
+  
+    function toggleTask(id) {  
+        tasks = tasks.map(t => { if(t.id === id){ if(!t.done) stopAlarm(); return {...t, done: !t.done}; } return t; });  
+        save(); render();  
+    }  
+  
+    function save() { localStorage.setItem('pro_elite_v5.8', JSON.stringify(tasks)); }  
+  
+    function render() {  
+        const list = document.getElementById('list'), search = document.getElementById('search').value.toLowerCase(), sort = document.getElementById('sort').value;  
+        let filtered = tasks.filter(t => t.title.toLowerCase().includes(search));  
+          
+        if (sort === "date") filtered.sort((a,b) => new Date(a.date) - new Date(b.date));  
+        else filtered.sort((a,b) => b.id - a.id);  
+  
+        list.innerHTML = filtered.map(t => `  
+            <li class="task-item ${t.done ? 'done' : (t.date && new Date(t.date) < new Date() ? 'overdue' : '')}">  
+                <div style="display:flex; align-items:center; flex:1;">  
+                    <div class="check-box ${t.done ? 'checked' : ''}" onclick="toggleTask(${t.id})"></div>  
+                    <div>  
+                        <div style="font-weight:700; font-size:0.8rem;">${t.title}</div>  
+                        <div style="font-size:0.6rem; color:var(--text-light);">${t.date ? t.date.replace('T', ' à ') : 'ASAP'}</div>  
+                    </div>  
+                </div>  
+                <div class="actions">  
+                    <button class="icon-btn" onclick="editTask(${t.id})"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>  
+                    <button class="icon-btn" onclick="deleteTask(${t.id})"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>  
+                </div>  
+            </li>  
+        `).join('');  
+    }  
+    render();  
+</script>  </body>  
+</html>  
